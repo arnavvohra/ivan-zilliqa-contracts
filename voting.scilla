@@ -1,0 +1,37 @@
+scilla_version 0
+
+contract Voting(organizer:ByStr20, description:String)
+
+field yesCount:Int256 = Int256 0
+field noCount:Int256 = Int256 0
+field voted:Map ByStr20 Bool = Emp ByStr20 Bool   
+
+transition voteYes()
+  alreadyVoted <-exists voted[_sender];
+  match alreadyVoted with
+    | True => throw
+    | False =>
+      one256 = Int256 1;
+      yesCountTmp<-yesCount;
+      yesCountPlusOne = builtin add yesCountTmp one256;
+      yesCount:=yesCountPlusOne;
+      true = True;
+      voted[_sender]:= true
+  end    
+
+end
+
+transition voteNo()
+  alreadyVoted <-exists voted[_sender];
+    match alreadyVoted with
+    | True => throw
+    | False =>
+      one256 = Int256 1;
+      noCountTmp<-noCount;
+      noCountPlusOne = builtin add noCountTmp one256;
+      noCount:=noCountPlusOne;
+      true = True;
+      voted[_sender]:= true
+    end
+
+end
