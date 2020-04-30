@@ -1,0 +1,107 @@
+scilla_version 0
+
+(***************************************************)
+(*               Associated library                *)
+(***************************************************)
+import ListUtils
+library Puzzle
+
+(* 
+  Players have to guess the pre-image of a hash.
+  The hash is defined at the contract deployment time.
+*)
+
+
+let hash_dist =
+  fun (h0 : ByStr32) =>
+  fun (h1 : ByStr32) =>
+    let h00 = builtin to_uint256 h0 in
+    let h11 = builtin to_uint256 h1 in
+    let lt = builtin lt h00 h11 in
+    match lt with
+    | False =>
+      builtin sub h00 h11
+    | True =>
+      builtin sub h11 h00
+    end
+    
+let f_eq =
+  fun (a : ByStr20) =>
+  fun (b : ByStr20) =>
+    builtin eq a b
+    
+let one_msg = 
+  fun (msg : Message) => 
+  let nil_msg = Nil {Message} in
+  Cons {Message} msg nil_msg
+  
+
+let list_mem_bystr20 = @list_mem ByStr20
+
+contract Puzzle(puzzleHash: ByStr32, owner : ByStr20)
+
+field currentBestGuess : Option Uint256 = None {Uint256}
+field currentBestScore : Option Uint256 = None {Uint256}
+field currentBestPlayer : Option ByStr20 = None {ByStr20}
+field playerAddresses : List ByStr20 = Nil {ByStr20}
+field playerScores : List Uint256 = Nil {Uint256}
+
+transition submitGuess(myGuess: Uint256)
+  players <- playerAddresses;
+  scores  <- playerScores; 
+  currentBest <- currentBestScore;
+  check_membership = list_mem_bystr20 f_eq _sender players;
+  match check_membership with
+  | True  => throw
+  | False =>
+    a = builtin to_string myGuess;
+    h = builtin sha256hash a;
+    score = hash_dist h puzzleHash;
+    match currentBest with
+    | None => 
+      newBestGuess = Some {Uint256} myGuess;
+      newBestScore = Some {Uint256} score;
+      newBestPlayer = Some {ByStr20} _sender;
+      currentBestGuess := newBestGuess;
+      currentBestScore := newBestScore;
+      currentBestPlayer := newBestPlayer
+    | Some bestScore => 
+      isBetter = builtin lt score bestScore;
+      match isBetter with
+      | True =>
+        newBestGuess = Some {Uint256} myGuess;
+        newBestScore = Some {Uint256} score;
+        newBestPlayer = Some {ByStr20} _sender;
+        currentBestGuess := newBestGuess;
+        currentBestScore := newBestScore;
+        currentBestPlayer := newBestPlayer
+      | False =>
+      end
+    end;
+    new_players = Cons {ByStr20} _sender players;
+    playerAddresses := new_players;
+    new_scores = Cons {Uint256} score scores;
+    playerScores := new_scores
+  end
+end
+
+transition rewardWinner()
+  isOwner = builtin eq _sender owner;
+  bal <- _balance;
+  match isOwner with
+  | False => throw
+  | True => 
+    bestPlayer <- currentBestPlayer;
+    match bestPlayer with
+    | Some player =>
+      msg = {_tag : ""; _recipient : player; _amount : bal};
+      msgs = one_msg msg;
+      send msgs
+    | None => throw
+    end
+  end
+end
+
+transition addFunds()
+  accept
+end
