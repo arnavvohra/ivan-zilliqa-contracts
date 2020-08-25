@@ -50,6 +50,7 @@ transition submitGuess(myGuess: Uint256)
   players <- playerAddresses;
   scores  <- playerScores; 
   currentBest <- currentBestScore;
+  (* Check if sender is in players list *)
   check_membership = list_mem_bystr20 f_eq _sender players;
   match check_membership with
   | True  => throw
